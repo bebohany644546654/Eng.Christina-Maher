@@ -23,7 +23,6 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize Firebase services
 const auth = getAuth(app);
-const db = getFirestore(app);
 const storage = getStorage(app);
 
 
@@ -83,10 +82,12 @@ Network.addListener('networkStatusChange', (status) => {
 });
 
 // Export with updated Firestore instance
+const db = firestoreInstance; // Assign to a constant first
+
 export { 
   app, 
   auth, 
-  db: firestoreInstance, 
+  db, 
   storage, 
   firebaseConfig, 
   isOnline 

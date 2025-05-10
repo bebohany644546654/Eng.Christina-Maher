@@ -1,7 +1,13 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 import { Attendance, Grade, Video, Book, Student } from "@/types";
+import { showNotification } from '../components/Notifications';
+import { useDataPersistence } from '@/hooks/use-data-persistence';
 import { toast } from "@/hooks/use-toast";
-import { db, isOnline } from "@/firebase"; // Updated import path, rtdb might not be needed directly if not used
+import { 
+  Firestore, collection, query, getDocs, doc, writeBatch,
+  updateDoc, deleteDoc, setDoc, onSnapshot, addDoc, serverTimestamp 
+} from "firebase/firestore";
+import { db, isOnline } from "@/firebase";
 import { 
   collection, query, getDocs, doc, 
   updateDoc, deleteDoc, setDoc, onSnapshot, addDoc, serverTimestamp 

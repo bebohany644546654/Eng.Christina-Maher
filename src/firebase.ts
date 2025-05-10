@@ -27,20 +27,31 @@ const storage = getStorage(app);
 
 
 // Configure Firestore for robust synchronization and offline support
-import { enableMultiTabIndexedDbPersistence, initializeFirestore, CACHE_SIZE_UNLIMITED } from 'firebase/firestore';
+import { enableMultiTabIndexedDbPersistence, initializeFirestore, CACHE_SIZE_UNLIMITED, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 
-// Enhanced Firestore initialization with multi-tab support and unlimited cache
+// Enhanced Firestore initialization with optimizations for large-scale educational platform
 const firestoreInstance = initializeFirestore(app, {
-  cacheSizeBytes: CACHE_SIZE_UNLIMITED
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager(),
+    cacheSizeBytes: CACHE_SIZE_UNLIMITED
+  }),
+  experimentalForceLongPolling: true, // Better for many simultaneous connections
+  experimentalAutoDetectLongPolling: true,
+  ignoreUndefinedProperties: true // Helps with data consistency
 });
 
-// Enable multi-tab persistence for better cross-device sync
+// Initialize with optimized settings for educational platform
 enableMultiTabIndexedDbPersistence(firestoreInstance)
+  .then(() => {
+    console.log('Offline persistence enabled successfully');
+  })
   .catch((err) => {
     if (err.code === 'failed-precondition') {
-      console.warn('Firestore persistence failed: Multiple tabs open.');
+      console.warn('Firestore persistence failed: Multiple tabs open. Some features may be limited.');
     } else if (err.code === 'unimplemented') {
-      console.warn('Firestore persistence not supported in this browser.');
+      console.warn('Firestore persistence not supported in this browser. Using alternative storage.');
+      // Use localStorage as fallback
+      window.localStorage.setItem('firestore-fallback-enabled', 'true');
     }
   });
 

@@ -1,130 +1,61 @@
+/* Main Styles */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  font-family: 'Tajawal', system-ui, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: dark;
-  color: white;
-  background-color: #0e1525;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
+/* Base Layer */
 @layer base {
-  body {
-    @apply direction-rtl;
-  }
-
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --physics-navy: #171E31;
+    --physics-dark: #0E1525;
+    --physics-gold: #D4AF37;
+    --physics-lightgold: #fbbf24;
   }
-}
 
-@layer utilities {
-  .direction-rtl {
+  body {
+    font-family: 'Tajawal', sans-serif;
+    color: white;
+    background-color: #0E1525;
     direction: rtl;
-  }
-
-  .direction-ltr {
-    direction: ltr;
   }
 }
 
 @layer components {
-  .inputField {
-    @apply bg-physics-navy/90 text-white px-4 py-2 rounded-lg border-2 border-physics-gold
-    focus:outline-none focus:ring-2 focus:ring-physics-gold/50 disabled:opacity-50
-    transition-all duration-300 placeholder:text-gray-400 w-full;
+  .input-base {
+    background-color: rgba(23, 30, 49, 0.9);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    border: 2px solid #D4AF37;
+    transition: all 300ms;
   }
 
-  .goldBtn {
-    @apply bg-physics-gold text-physics-navy font-semibold px-4 py-2 rounded-lg
-    transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg
-    active:scale-95 active:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed
-    disabled:hover:scale-100 disabled:active:scale-100 focus:outline-none focus:ring-2 
-    focus:ring-physics-gold/50 focus:ring-offset-2 focus:ring-offset-physics-navy;
+  .input-base:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.5);
+  }
+
+  .btn-gold {
+    background-color: #D4AF37;
+    color: #171E31;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    transition: all 300ms;
+  }
+
+  .btn-gold:hover {
+    transform: scale(1.02);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  }
+}
+
+@layer utilities {
+  .text-physics-lightgold {
+    color: #fbbf24;
   }
 
   .physics-bg {
     background-image: radial-gradient(circle at center, #171E31 0%, #0E1525 100%);
   }
-
-  .iconButton {
-    @apply p-2 rounded-full transition-all duration-300 hover:bg-physics-gold/20
-    text-physics-gold hover:scale-110 active:scale-95 focus:outline-none
-    focus:ring-2 focus:ring-physics-gold/50;
-  }
-
-  .cardHover {
-    @apply transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg;
-  }
-
-  .dropdownItem {
-    @apply flex items-center px-4 py-2 text-sm transition-colors duration-200
-    hover:bg-physics-gold/20 cursor-pointer;
-  }
-
-  .youtube-embed {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    background: #000;
-    border-radius: 0.5rem;
-    overflow: hidden;
-  }
-
-  .youtube-embed iframe {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    border: 0;
-    border-radius: 0.5rem;
-  }
-}
-
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #091138;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #D4AF37;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #B08E23;
 }

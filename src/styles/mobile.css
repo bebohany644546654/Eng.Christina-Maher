@@ -1,0 +1,144 @@
+/* Mobile-specific styles */
+@media (max-width: 768px) {
+  /* Improved touch targets */
+  .mobile-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Mobile spacing */
+  .mobile-padding {
+    padding: 0.5rem 1rem;
+  }
+
+  /* Typography adjustments */
+  .mobile-text {
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  /* Stack items vertically */
+  .mobile-stack {
+    flex-direction: column;
+  }
+  
+  /* Form input improvements */
+  input, 
+  select, 
+  textarea {
+    font-size: 16px !important; /* Prevent iOS zoom */
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Button improvements */
+  button, 
+  .button {
+    min-height: 44px;
+    padding: 0.75rem 1.5rem;
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+
+  /* Modal improvements */
+  .modal-content {
+    width: 90% !important;
+    margin: 1rem auto;
+    max-height: 90vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Scrollable containers */
+  .scrollable {
+    -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+
+  /* Navigation improvements */
+  .nav-item {
+    padding: 0.75rem 1rem;
+  }
+
+  /* Table adjustments */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Card improvements */
+  .card {
+    margin: 0.5rem;
+    padding: 1rem;
+  }
+
+  /* Grid adjustments */
+  .grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem;
+  }
+
+  /* Fix for fixed position elements */
+  .fixed-element {
+    position: fixed;
+    bottom: 1rem;
+    left: 1rem;
+    right: 1rem;
+    z-index: 1000;
+  }
+
+  /* Handle iOS safe areas */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* Bottom navigation for mobile */
+.mobile-bottom-nav {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--physics-navy);
+    padding: 0.5rem;
+    padding-bottom: env(safe-area-inset-bottom);
+    border-top: 1px solid var(--physics-gold);
+    z-index: 1000;
+  }
+
+  .mobile-bottom-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    color: var(--physics-gold);
+    text-decoration: none;
+    font-size: 0.75rem;
+  }
+
+  .mobile-bottom-nav-item.active {
+    color: var(--physics-lightgold);
+  }
+
+  .mobile-bottom-nav-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+  }
+}

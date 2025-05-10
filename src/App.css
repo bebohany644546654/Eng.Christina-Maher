@@ -9,12 +9,34 @@
   --physics-lightgold: #fbbf24;
 }
 
-/* Base styles and utility classes */
+/* Base styles */
 body {
   direction: rtl;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   background-color: var(--physics-navy);
   color: white;
+}
+
+/* Mobile-specific styles */
+@media (max-width: 768px) {
+  .mobile-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .mobile-padding {
+    padding: 0.5rem 1rem;
+  }
+
+  .mobile-text {
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  .mobile-stack {
+    display: flex;
+    flex-direction: column;
+  }
 }
 
 .bg-physics-navy {

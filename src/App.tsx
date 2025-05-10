@@ -28,8 +28,6 @@ import PaymentsManagement from "./pages/PaymentsManagement";
 import SystemReset from "./pages/SystemReset";
 import { useEffect } from "react";
 import "./App.css";
-import { NotificationTest } from "./components/NotificationTest";
-import { NotificationsProvider } from "./components/Notifications";
 
 // استيراد خط Tajawal للنص العربي
 import "@fontsource/tajawal/400.css"; 
@@ -83,14 +81,23 @@ const App = () => {
       <AuthProvider>
         <DataProvider>
           <TooltipProvider>
-            <NotificationsProvider />
+            <SonnerToaster 
+              toastOptions={{
+                style: {
+                  background: '#171E31',
+                  color: 'white',
+                  border: '1px solid #D4AF37',
+                  borderRadius: '12px',
+                  opacity: '1',
+                },
+                duration: 2000 // Set duration to 2 seconds
+              }} 
+            />
             <BrowserRouter>
               <div className="relative min-h-screen font-tajawal">
                 <PhysicsBackground />
                 <div className="relative z-10">
                   <Routes>
-                    {/* Add the test route at the top */}
-                    <Route path="/test-notifications" element={<NotificationTest />} />
                     <Route path="/" element={<Index />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/dashboard" element={<RequireAuth children={<Dashboard />} />} />
@@ -120,13 +127,10 @@ const App = () => {
                     
                     {/* Auth error routes */}
                     <Route path="/unauthorized" element={<Unauthorized />} />
-                    
-                    {/* Add catch-all route */}
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </div>
               </div>
-              <SonnerToaster />
             </BrowserRouter>
           </TooltipProvider>
         </DataProvider>

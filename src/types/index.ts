@@ -38,6 +38,11 @@ export interface Book {
   grade: "first" | "second" | "third";
 }
 
+export interface LoginDevice {
+  deviceInfo: string;
+  timestamp: string;
+}
+
 export interface Student {
   id: string;
   name: string;
@@ -49,6 +54,11 @@ export interface Student {
   qrCode?: string;
   group?: string;
   code: string;
+  attendance?: Record<string, any>;
+  payments?: Record<string, any>;
+  gradesDetails?: Record<string, any>;
+  lastLogin?: string;
+  loginDevices?: LoginDevice[];
 }
 
 export interface Parent {
@@ -77,8 +87,10 @@ export interface Payment {
   studentName: string;
   grade: "first" | "second" | "third";
   paidMonths: number;
+  monthlyFee: number;
+  totalPaid: number;
   lastPayment?: string; // جعل الحقل اختياري
-  student: Student;
+  status: string;
 }
 
 export interface Resource {

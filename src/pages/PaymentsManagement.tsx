@@ -28,8 +28,9 @@ import { Logo } from "@/components/Logo";
 import { useToast } from "@/components/ui/use-toast";
 
 const PaymentsManagement = () => {
+  console.log('PaymentsManagement: Rendering component');
   const navigate = useNavigate();
-  const { getAllStudents } = useAuth();
+  const { getAllStudents, students } = useAuth();
   const { getAllPayments, addPayment } = useData();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGrade, setSelectedGrade] = useState<"all" | "first" | "second" | "third">("all");
@@ -39,8 +40,55 @@ const PaymentsManagement = () => {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [searchStudentTerm, setSearchStudentTerm] = useState("");
   const [monthsToPay, setMonthsToPay] = useState(1);
-  const [filteredPayments, setFilteredPayments] = useState(getAllPayments());
-  const [searchResults, setSearchResults] = useState<Student[]>([]);
+  const [filteredPayments, setFilteredPayments] = useState<Payment[]>([]);
+  const [searchResults, setSearchResults] = useState<Student[]>(getAllStudents());
+
+  // Comprehensive logging and initialization for payments
+  useEffect(() => {
+    // Attempt to retrieve payments from localStorage
+    const storedPayments = localStorage.getItem('payments');
+    const parsedPayments = storedPayments ? JSON.parse(storedPayments) : [];
+
+    // Validate and synchronize payments with current students
+    const validPayments = parsedPayments.filter(payment => 
+      students.some(student => student.id === payment.studentId)
+    );
+
+    // Update payments to reflect current student data
+    const synchronizedPayments = validPayments.map(payment => {
+      const student = students.find(s => s.id === payment.studentId);
+      
+      if (student) {
+        return {
+          ...payment,
+          studentName: student.name,
+          studentCode: student.code,
+          grade: student.grade
+        };
+      }
+      
+      return payment;
+    });
+
+    // Log synchronization details
+    console.log('Synchronization Debug:', {
+      storedPaymentsCount: parsedPayments.length,
+      validPaymentsCount: validPayments.length,
+      synchronizedPaymentsCount: synchronizedPayments.length
+    });
+
+    // Update localStorage and state
+    localStorage.setItem('payments', JSON.stringify(synchronizedPayments));
+    setFilteredPayments(synchronizedPayments);
+  }, [students]);
+
+  useEffect(() => {
+    const allStudents = getAllStudents();
+    setSearchResults(allStudents.filter(student => 
+      student.name.toLowerCase().includes(searchStudentTerm.toLowerCase())
+    ));
+  }, [searchStudentTerm]);
+
   const { toast } = useToast();
 
   const handleSort = (field: string) => {
@@ -52,16 +100,65 @@ const PaymentsManagement = () => {
     }
   };
 
-  const handleAddPayment = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedStudent) return;
+  const handleAddPayment = () => {
+    // Validate inputs
+    if (!selectedStudent) {
+      toast({
+        description: "اختر طالب أولا",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    addPayment(selectedStudent.id, monthsToPay);
-    setShowNewPaymentForm(false);
-    setSelectedStudent(null);
-    setMonthsToPay(1);
-    setSearchStudentTerm("");
-    setFilteredPayments(getAllPayments());
+    if (monthsToPay <= 0) {
+      toast({
+        description: "أدخل عدد صحيح من الأشهر",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Attempt to add payment
+      const newPayment = addPayment(selectedStudent.id, monthsToPay);
+      
+      if (newPayment) {
+        toast({
+          title: "تم إضافة الدفعة",
+          description: `تم تسجيل دفعة لـ ${selectedStudent.name} لمدة ${monthsToPay} شهر(أشهر)`,
+          variant: "default",
+          style: {
+            backgroundColor: '#171E31',
+            color: '#ffffff',
+            border: '2px solid #4CAF50'
+          }
+        });
+
+        // Reset form
+        setShowNewPaymentForm(false);
+        setSelectedStudent(null);
+        setMonthsToPay(1);
+        setSearchStudentTerm("");
+        
+        // Refresh filtered payments
+        const updatedPayments = JSON.parse(localStorage.getItem('payments') || '[]');
+        setFilteredPayments(updatedPayments);
+      } else {
+        throw new Error('فشل إضافة الدفعة');
+      }
+    } catch (error) {
+      // Show error notification
+      console.error(error);
+      toast({
+        description: "حدث خطأ أثناء تسجيل الدفع ❗",
+        variant: "destructive",
+        style: {
+          backgroundColor: '#171E31',
+          color: '#ffffff',
+          border: '2px solid #FF5252'
+        }
+      });
+    }
   };
 
   const handleSearch = (searchValue: string) => {
@@ -197,8 +294,6 @@ const PaymentsManagement = () => {
     return () => clearInterval(intervalId);
   }, [getAllPayments, selectedGrade, searchQuery, sortField, sortDirection]);
 
-  const students = getAllStudents();
-
   // تحديث وظيفة نسخ الكود
   const copyToClipboard = async (code: string) => {
     if (!code) return;
@@ -314,7 +409,7 @@ const PaymentsManagement = () => {
                 <div className="flex gap-4">
                   <h2 className="text-xl font-semibold text-physics-gold">سجل المدفوعات</h2>
                   <Badge variant="outline" className="bg-physics-navy/20 text-physics-gold border-physics-gold">
-                    {filteredPayments.length} طالب
+                    {filteredPayments.length === 0 ? 'لا توجد مدفوعات' : `${filteredPayments.length} دفعة`}
                   </Badge>
                 </div>
               </div>
@@ -333,51 +428,59 @@ const PaymentsManagement = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredPayments.map((payment) => {
-                    const student = getAllStudents().find(s => s.id === payment.studentId);
-                    return (
-                      <TableRow 
-                        key={payment.id} 
-                        className="border-b border-physics-gold/10 hover:bg-physics-navy/30"
-                      >
-                        <TableCell className="py-2.5 px-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-white font-medium">{payment.studentCode}</span>
-                            <button
-                              onClick={() => copyToClipboard(payment.studentCode)}
-                              className="p-1.5 rounded-md hover:bg-physics-navy/50 transition-colors focus:outline-none focus:ring-2 focus:ring-physics-gold/30"
+                  {filteredPayments.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-physics-gold">
+                        لا توجد مدفوعات مسجلة حتى الآن
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredPayments.map((payment) => {
+                      const student = getAllStudents().find(s => s.id === payment.studentId);
+                      return (
+                        <TableRow 
+                          key={payment.id} 
+                          className="border-b border-physics-gold/10 hover:bg-physics-navy/30"
+                        >
+                          <TableCell className="py-2.5 px-4">
+                            <div className="flex items-center gap-2">
+                              <span className="text-white font-medium">{payment.studentCode}</span>
+                              <button
+                                onClick={() => copyToClipboard(payment.studentCode)}
+                                className="p-1.5 rounded-md hover:bg-physics-navy/50 transition-colors focus:outline-none focus:ring-2 focus:ring-physics-gold/30"
+                              >
+                                <Copy className="h-3.5 w-3.5 text-physics-gold" />
+                              </button>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-2.5 px-4 text-white font-medium">{payment.studentName}</TableCell>
+                          <TableCell className="py-2.5 px-4 text-white">{getGradeDisplay(payment.grade)}</TableCell>
+                          <TableCell className="py-2.5 px-4">
+                            <div className="flex justify-center gap-1">
+                              {Array.from({ length: payment.paidMonths }).map((_, index) => (
+                                <CheckCircle key={index} className="text-physics-gold h-4 w-4" />
+                              ))}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-2.5 px-4">
+                            {payment.paidMonths > 0 ? (
+                              <span className="text-white">{formatDate(payment.lastPayment)}</span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="py-2.5 px-4 text-center">
+                            <Badge 
+                              variant="outline" 
+                              className="bg-physics-navy/20 text-physics-gold border-physics-gold"
                             >
-                              <Copy className="h-3.5 w-3.5 text-physics-gold" />
-                            </button>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-2.5 px-4 text-white font-medium">{payment.studentName}</TableCell>
-                        <TableCell className="py-2.5 px-4 text-white">{getGradeDisplay(payment.grade)}</TableCell>
-                        <TableCell className="py-2.5 px-4">
-                          <div className="flex justify-center gap-1">
-                            {Array.from({ length: payment.paidMonths }).map((_, index) => (
-                              <CheckCircle key={index} className="text-physics-gold h-4 w-4" />
-                            ))}
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-2.5 px-4">
-                          {payment.paidMonths > 0 ? (
-                            <span className="text-white">{formatDate(payment.lastPayment)}</span>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="py-2.5 px-4 text-center">
-                          <Badge 
-                            variant="outline" 
-                            className="bg-physics-navy/20 text-physics-gold border-physics-gold"
-                          >
-                            {student?.group || '-'}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                              {getAllStudents().find(s => s.id === payment.studentId)?.group || '-'}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
                 </TableBody>
               </Table>
             </div>

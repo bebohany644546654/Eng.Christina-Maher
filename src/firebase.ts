@@ -27,31 +27,67 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 
 
-// Enable offline persistence for Firestore
-enableIndexedDbPersistence(db)
+// Configure Firestore for robust synchronization and offline support
+import { enableMultiTabIndexedDbPersistence, initializeFirestore, CACHE_SIZE_UNLIMITED } from 'firebase/firestore';
+
+// Enhanced Firestore initialization with multi-tab support and unlimited cache
+const firestoreInstance = initializeFirestore(app, {
+  cacheSizeBytes: CACHE_SIZE_UNLIMITED
+});
+
+// Enable multi-tab persistence for better cross-device sync
+enableMultiTabIndexedDbPersistence(firestoreInstance)
   .catch((err) => {
-    if (err.code == 'failed-precondition') {
-      // This can happen if multiple tabs are open, persistence can only be enabled in one tab at a time.
-      console.warn("Firestore persistence failed due to multiple tabs open.");
-    } else if (err.code == 'unimplemented') {
-      // The current browser does not support all of the features required to enable persistence
-      console.warn("Firestore persistence is not supported in this browser.");
+    if (err.code === 'failed-precondition') {
+      console.warn('Firestore persistence failed: Multiple tabs open.');
+    } else if (err.code === 'unimplemented') {
+      console.warn('Firestore persistence not supported in this browser.');
     }
   });
 
-// Network state monitoring
-let isOnline = true; // Assume online by default, will be updated by Network listener
+// Network state monitoring with enhanced logging
+let isOnline = true;
+let networkRetryCount = 0;
+const MAX_NETWORK_RETRIES = 3;
 
-// Initial network state check
-Network.getStatus().then(status => {
-  isOnline = status.connected;
-  console.log(`Initial network status: ${isOnline ? 'Online' : 'Offline'}`);
-});
+// Initial network state check with retry mechanism
+const checkNetworkStatus = async () => {
+  try {
+    const status = await Network.getStatus();
+    isOnline = status.connected;
+    console.log(`Network status: ${isOnline ? 'Online' : 'Offline'}`);
+    
+    if (!isOnline && networkRetryCount < MAX_NETWORK_RETRIES) {
+      networkRetryCount++;
+      setTimeout(checkNetworkStatus, 5000); // Retry after 5 seconds
+    } else {
+      networkRetryCount = 0;
+    }
+  } catch (error) {
+    console.error('Network status check failed:', error);
+  }
+};
 
-// Listen for network status changes
-Network.addListener('networkStatusChange', status => {
+// Initial check
+checkNetworkStatus();
+
+// Listen for network status changes with more robust handling
+Network.addListener('networkStatusChange', (status) => {
   isOnline = status.connected;
   console.log(`Network status changed: ${isOnline ? 'Online' : 'Offline'}`);
+  
+  if (isOnline) {
+    // Attempt to sync data when back online
+    console.log('Network restored. Attempting data synchronization...');
+  }
 });
 
-export { app, auth, db, storage, firebaseConfig, isOnline };
+// Export with updated Firestore instance
+export { 
+  app, 
+  auth, 
+  db: firestoreInstance, 
+  storage, 
+  firebaseConfig, 
+  isOnline 
+};

@@ -1,20 +1,16 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, ReactNode, useState, useCallback, useMemo, useEffect, useContext } from 'react';
 import { Attendance, Grade, Video, Book, Student } from "@/types";
 import { showNotification } from '../components/Notifications';
 import { useDataPersistence } from '@/hooks/use-data-persistence';
 import { toast } from "@/hooks/use-toast";
-import { 
-  Firestore, collection, query, getDocs, doc, writeBatch,
-  updateDoc, deleteDoc, setDoc, onSnapshot, addDoc, serverTimestamp 
-} from "firebase/firestore";
 import { db, isOnline } from "@/firebase";
 import { 
-  collection, query, getDocs, doc, 
-  updateDoc, deleteDoc, setDoc, onSnapshot, addDoc, serverTimestamp 
+  collection, query, getDocs, doc, writeBatch,
+  updateDoc, deleteDoc, setDoc, onSnapshot, addDoc, serverTimestamp,
+  CollectionReference, DocumentReference
 } from "firebase/firestore";
 import { ref, onValue, set, get } from "firebase/database";
 import { Network } from '@capacitor/network';
-import { showNotification } from '../components/Notifications';
 
 interface Payment {
   id: string;
@@ -105,8 +101,8 @@ interface DataContextType {
 
   // Resource methods
   saveResource: (
-    title: string,
-    description: string,
+    title: string, 
+    description: string, 
     file: File | null,
     fileUrl: string | null,
     gradeLevel: "first" | "second" | "third",
@@ -118,27 +114,235 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
-export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [attendance, setAttendance] = useState<Attendance[]>(() => {
-    const savedAttendance = localStorage.getItem('attendance');
-    return savedAttendance ? JSON.parse(savedAttendance) : [];
-  });
+export const DataProvider = ({ children }: { children: ReactNode }): JSX.Element => {
+  const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [files, setFiles] = useState<FileResource[]>(() => {
-    const savedFiles = localStorage.getItem('localFiles');
-    return savedFiles ? JSON.parse(savedFiles) : [];
-  });
-  const [resources, setResources] = useState<Resource[]>(() => {
-    const savedResources = localStorage.getItem('localResources');
-    return savedResources ? JSON.parse(savedResources) : [];
-  });
+  const [files, setFiles] = useState<FileResource[]>([]);
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [students, setStudents] = useState<Student[]>(
+    JSON.parse(localStorage.getItem('students') || '[]')
+  );
 
-  // Initialize data from local storage and setup Firebase sync
+  const addAttendance = useCallback((studentId: string, studentName: string, status: "present" | "absent") => {
+    const newAttendance: Attendance = {
+      id: Math.random().toString(),
+      studentId,
+      studentName,
+      status,
+      date: new Date().toISOString().split('T')[0],
+      time: new Date().toLocaleTimeString(),
+      lessonNumber: 1 // Default lesson number, adjust as needed
+    };
+    setAttendance(prev => [...prev, newAttendance]);
+  }, []);
+
+  const getStudentAttendance = useCallback((studentId: string): Attendance[] => {
+    return attendance.filter(a => a.studentId === studentId);
+  }, [attendance]);
+
+  const getAttendanceByGrade = useCallback((grade: "first" | "second" | "third"): Attendance[] => {
+    // Note: Attendance doesn't have a grade field, so this might need to be adjusted
+    return attendance;
+  }, [attendance]);
+
+  const getStudentLessonCount = useCallback((studentId: string): number => {
+    return attendance.filter(a => a.studentId === studentId).length;
+  }, [attendance]);
+
+  const deleteAttendance = useCallback((recordId: string, studentName: string) => {
+    setAttendance(prev => prev.filter(a => a.id !== recordId));
+  }, []);
+
+  const saveGrade = useCallback((grade: Grade) => {
+    setGrades(prev => [...prev, grade]);
+  }, []);
+
+  const updateBook = useCallback((bookId: string, updates: any) => {
+    setBooks(prev => prev.map(b => b.id === bookId ? { ...b, ...updates } : b));
+  }, []);
+
+  const deleteBook = useCallback((bookId: string) => {
+    setBooks(prev => prev.filter(b => b.id !== bookId));
+  }, []);
+
+  const saveResource = useCallback(async (
+    title: string, 
+    description: string, 
+    file: File | null,
+    fileUrl: string | null,
+    gradeLevel: "first" | "second" | "third",
+    type: "book" | "file"
+  ): Promise<void> => {
+    const newResource: Resource = {
+      id: Math.random().toString(),
+      title,
+      description,
+      gradeLevel,
+      type,
+      uploadDate: Date.now(),
+      fileUrl,
+      fileName: file?.name,
+      fileType: file?.type
+    };
+
+    setResources(prev => [...prev, newResource]);
+  }, []);
+
+  const deleteResource = useCallback((resourceId: string) => {
+    setResources(prev => prev.filter(r => r.id !== resourceId));
+  }, []);
+
+  const getResourcesByGrade = useCallback((gradeLevel: "first" | "second" | "third"): Resource[] => {
+    return resources.filter(r => r.gradeLevel === gradeLevel);
+  }, [resources]);
+
+  const saveFile = useCallback(async (
+    title: string, 
+    description: string, 
+    file: File, 
+    gradeLevel: "first" | "second" | "third"
+  ): Promise<void> => {
+    const newFile: FileResource = {
+      id: Math.random().toString(),
+      title,
+      description,
+      fileData: await file.text(),
+      fileType: file.type,
+      fileName: file.name,
+      gradeLevel,
+      uploadDate: Date.now()
+    };
+
+    setFiles(prev => [...prev, newFile]);
+  }, []);
+
+  const getFilesByGrade = useCallback((gradeLevel: "first" | "second" | "third"): FileResource[] => {
+    return files.filter(f => f.gradeLevel === gradeLevel);
+  }, [files]);
+
+  const deleteFile = useCallback((fileId: string) => {
+    setFiles(prev => prev.filter(f => f.id !== fileId));
+  }, []);
+
+  const addPayment = useCallback((studentId: string, months: number) => {
+    try {
+      console.log('Adding payment - Input:', { studentId, months });
+      console.log('Current students:', students);
+
+      const student = students.find(s => s.id === studentId);
+      if (!student) {
+        console.error('Student not found:', studentId);
+        alert(`خطأ: لم يتم العثور على الطالب (${studentId})`);
+        return null;
+      }
+
+      const monthlyFee = 100;
+      const newPayment: Payment = {
+        id: `payment_${Date.now()}_${studentId}`,
+        studentId,
+        studentName: student.name,
+        studentCode: student.code,
+        grade: student.grade,
+        paidMonths: months,
+        monthlyFee,
+        totalPaid: months * monthlyFee,
+        lastPayment: new Date().toISOString(),
+        status: months > 0 ? 'حالي' : 'متأخر'
+      };
+
+      console.log('New payment object:', newPayment);
+
+      // Retrieve current payments, ensuring it's an array
+      const storedPayments = localStorage.getItem('payments');
+      const currentPayments = storedPayments ? JSON.parse(storedPayments) : [];
+
+      // Remove any existing payments for this student
+      const filteredPayments = currentPayments.filter(p => p.studentId !== studentId);
+
+      // Add new payment
+      const updatedPayments = [...filteredPayments, newPayment];
+
+      console.log('Current payments:', currentPayments);
+      console.log('Updated payments:', updatedPayments);
+
+      // Save to localStorage and update state
+      localStorage.setItem('payments', JSON.stringify(updatedPayments));
+      setPayments(updatedPayments);
+
+      console.log('Payments after setting:', payments);
+
+      return newPayment;
+    } catch (error) {
+      console.error('Error adding payment:', error);
+      alert('حدث خطأ أثناء إضافة الدفعة');
+      return null;
+    }
+  }, [students]);
+
+  const getAllPayments = useCallback(() => {
+    console.log('Getting all payments');
+    console.log('Payments:', payments);
+    return payments;
+  }, [payments]);
+
   useEffect(() => {
-    // Load initial data from localStorage
+    localStorage.setItem('students', JSON.stringify(students));
+  }, [students]);
+
+  const contextValue = useMemo<DataContextType>(() => ({
+    attendance,
+    grades,
+    videos,
+    books,
+    payments,
+    files,
+    resources,
+    addAttendance,
+    getStudentAttendance,
+    getAttendanceByGrade,
+    getStudentLessonCount,
+    deleteAttendance,
+    saveGrade,
+    updateBook,
+    deleteBook,
+    saveResource,
+    deleteResource,
+    getResourcesByGrade,
+    saveFile,
+    getFilesByGrade,
+    deleteFile,
+    addPayment,
+    // Placeholder methods to complete DataContextType
+    addGrade: () => {},
+    getStudentGrades: () => [],
+    getGradesByGradeLevel: () => [],
+    deleteGrade: () => {},
+    updateGrade: () => {},
+    addVideo: async () => false,
+    updateVideo: () => {},
+    deleteVideo: () => {},
+    getVideosByGrade: () => [],
+    getAllVideos: () => [],
+    updateVideoViews: () => {},
+    saveVideo: () => false,
+    addBook: () => {},
+    getBooksByGrade: () => [],
+    getAllBooks: () => [],
+    getStudentPayments: () => [],
+    getAllPayments: () => payments,
+    updatePaymentStatus: () => {}
+  }), [
+    attendance, grades, videos, books, payments, files, resources,
+    addAttendance, getStudentAttendance, getAttendanceByGrade, 
+    getStudentLessonCount, deleteAttendance, saveGrade, 
+    saveResource, deleteResource, 
+    getResourcesByGrade, saveFile, getFilesByGrade, deleteFile
+  ]);
+
+  useEffect(() => {
     const loadLocalData = () => {
       try {
         setAttendance(JSON.parse(localStorage.getItem('attendance') || '[]'));
@@ -153,183 +357,54 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
-    // Setup Firebase real-time sync
-    const setupFirebaseSync = () => {
-      // Attendance sync
-      const attendanceRef = collection(db, 'attendance');
-      const unsubAttendance = onSnapshot(attendanceRef, (snapshot) => {
-        const attendanceData: Attendance[] = [];
-        snapshot.forEach((doc) => {
-          attendanceData.push({ id: doc.id, ...doc.data() } as Attendance);
-        });
-        setAttendance(attendanceData);
-        localStorage.setItem('attendance', JSON.stringify(attendanceData));
-      });
-
-      // Grades sync
-      const gradesRef = collection(db, 'grades');
-      const unsubGrades = onSnapshot(gradesRef, (snapshot) => {
-        const gradesData: Grade[] = [];
-        snapshot.forEach((doc) => {
-          gradesData.push({ id: doc.id, ...doc.data() } as Grade);
-        });
-        setGrades(gradesData);
-        localStorage.setItem('grades', JSON.stringify(gradesData));
-      });
-
-      // Similar patterns for videos, books, and payments...
-      
-      return () => {
-        unsubAttendance();
-        unsubGrades();
-        // Cleanup other listeners...
-      };
-    };
-
-    // Load local data first
     loadLocalData();
-
-    // Setup network status listener
-    let syncCleanup: (() => void) | null = null;
-    
-    const handleNetworkChange = async (status: { connected: boolean }) => {
-      if (status.connected) {
-        // We're online - setup Firebase sync
-        toast({
-          title: "متصل بالإنترنت",
-          description: "جاري مزامنة البيانات...",
-        });
-        syncCleanup = setupFirebaseSync();
-        
-        // Sync local changes to Firebase
-        try {
-          const localAttendance = JSON.parse(localStorage.getItem('attendance') || '[]');
-          const localGrades = JSON.parse(localStorage.getItem('grades') || '[]');
-          // ... sync other data
-          
-          await Promise.all([
-            syncDataToFirebase('attendance', localAttendance),
-            syncDataToFirebase('grades', localGrades),
-            // ... sync other collections
-          ]);
-          
-          toast({
-            title: "تمت المزامنة",
-            description: "تم مزامنة جميع البيانات بنجاح",
-          });
-        } catch (error) {
-          console.error("Sync error:", error);
-          toast({
-            variant: "destructive",
-            title: "خطأ في المزامنة",
-            description: "حدث خطأ أثناء مزامنة البيانات",
-          });
-        }
-      } else {
-        // We're offline - cleanup Firebase listeners
-        toast({
-          variant: "destructive",
-          title: "غير متصل",
-          description: "سيتم حفظ التغييرات محلياً حتى عودة الاتصال",
-        });
-        if (syncCleanup) {
-          syncCleanup();
-          syncCleanup = null;
-        }
-      }
-    };
-
-    // Initial network check and listener setup
-    Network.getStatus().then(handleNetworkChange);
-    const networkListener = Network.addListener('networkStatusChange', handleNetworkChange);
-
-    return () => {
-      if (syncCleanup) syncCleanup();
-      networkListener.remove();
-    };
   }, []);
 
-  const syncDataToFirebase = async (collection: string, data: any[]) => {
-    const collectionRef = collection(db, collection);
-    const batch = db.batch();
+  // Synchronize payments with students
+  useEffect(() => {
+    if (students.length === 0) return;
+
+    const storedPayments = JSON.parse(localStorage.getItem('payments') || '[]');
     
-    data.forEach((item) => {
-      const docRef = doc(collectionRef, item.id);
-      batch.set(docRef, item);
+    // Update payments to reflect current student data
+    const updatedPayments = storedPayments.map((payment) => {
+      const student = students.find(s => s.id === payment.studentId);
+      
+      if (student) {
+        return {
+          ...payment,
+          studentName: student.name,
+          studentCode: student.code,
+          grade: student.grade
+        };
+      }
+      
+      return payment;
     });
 
-    await batch.commit();
-  };
+    // Remove payments for deleted students
+    const validPayments = updatedPayments.filter((payment) => 
+      students.some(s => s.id === payment.studentId)
+    );
 
-  const saveResource = async (type: string, file: File, grade: string, title: string) => {
-    try {
-      // ...existing storage logic...
-      showNotification.info('جاري رفع الملف... 📤');
-      
-      // After successful upload
-      showNotification.uploaded();
-      return url;
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      showNotification.error('حدث خطأ أثناء رفع الملف ❌');
-      throw error;
+    // Only update if there are changes
+    if (validPayments.length !== storedPayments.length) {
+      localStorage.setItem('payments', JSON.stringify(validPayments));
+      setPayments(validPayments);
     }
-  };
+  }, [students]);
 
-  const updateBook = async (bookId: string, updates: any) => {
-    try {
-      showNotification.info('جاري حفظ التغييرات... 💾');
-      await updateDoc(doc(db, "books", bookId), updates);
-      showNotification.saved();
-    } catch (error) {
-      console.error('Error updating book:', error);
-      showNotification.error('حدث خطأ أثناء حفظ التغييرات ❌');
-      throw error;
-    }
-  };
+  useEffect(() => {
+    localStorage.setItem('attendance', JSON.stringify(attendance));
+    localStorage.setItem('grades', JSON.stringify(grades));
+    localStorage.setItem('videos', JSON.stringify(videos));
+    localStorage.setItem('books', JSON.stringify(books));
+    localStorage.setItem('payments', JSON.stringify(payments));
+    localStorage.setItem('localFiles', JSON.stringify(files));
+    localStorage.setItem('localResources', JSON.stringify(resources));
+  }, [attendance, grades, videos, books, payments, files, resources]);
 
-  const deleteBook = async (bookId: string) => {
-    try {
-      showNotification.warning('جاري حذف الكتاب... 🗑️');
-      await deleteDoc(doc(db, "books", bookId));
-      showNotification.success('تم حذف الكتاب بنجاح');
-    } catch (error) {
-      console.error('Error deleting book:', error);
-      showNotification.error('حدث خطأ أثناء حذف الكتاب ❌');
-      throw error;
-    }
-  };
-
-  const saveGrade = async (grade: any) => {
-    try {
-      showNotification.info('جاري حفظ الدرجة... 📝');
-      await addDoc(collection(db, "grades"), {
-        ...grade,
-        createdAt: serverTimestamp()
-      });
-      showNotification.success('تم حفظ الدرجة بنجاح 🎯');
-    } catch (error) {
-      console.error('Error saving grade:', error);
-      showNotification.error('حدث خطأ أثناء حفظ الدرجة ❌');
-      throw error;
-    }
-  };
-
-  const value = {
-    attendance,
-    grades,
-    videos,
-    books,
-    payments,
-    files,
-    resources,
-    saveResource,
-    updateBook,
-    deleteBook,
-    saveGrade
-  };
-
-  return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
+  return <DataContext.Provider value={contextValue}>{children}</DataContext.Provider>;
 };
 
 export const useData = () => {

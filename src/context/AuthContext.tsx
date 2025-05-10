@@ -1,9 +1,22 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import { 
+  collection, 
+  doc, 
+  setDoc, 
+  deleteDoc, 
+  getDocs, 
+  query, 
+  where, 
+  updateDoc, 
+  getDoc, 
+  onSnapshot, 
+  writeBatch, 
+  addDoc 
+} from "firebase/firestore";
+import { db } from "@/firebase"; 
+import { toast } from "@/hooks/use-toast";
 import { User, Student, Parent } from "@/types";
 import { generateRandomCode } from "@/lib/utils";
-import { toast } from "@/hooks/use-toast";
-import { db, isOnline } from "@/firebase"; // Updated import path, rtdb might not be needed directly if not used
-import { doc, setDoc, getDoc, onSnapshot, collection, writeBatch, deleteDoc, addDoc } from "firebase/firestore";
 import { Network } from '@capacitor/network';
 
 interface AuthContextType {
@@ -276,6 +289,135 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return false;
   };
 
+  const loginUser = async (code: string, password: string) => {
+    try {
+      // Comprehensive login with cross-device synchronization
+      const loginAttempt = new Date().toISOString();
+
+      // Query Firestore to find user with advanced synchronization
+      const q = query(
+        collection(db, "students"),
+        where("code", "==", code),
+        where("password", "==", password)
+      );
+
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const userData = querySnapshot.docs[0].data() as Student;
+        const userId = querySnapshot.docs[0].id;
+
+        // Create user object with enhanced synchronization metadata
+        const loggedInUser: Student = {
+          ...userData,
+          id: userId,
+          lastLogin: loginAttempt,
+          loginDevices: [
+            ...(userData.loginDevices || []),
+            {
+              deviceInfo: navigator.userAgent,
+              timestamp: loginAttempt
+            }
+          ]
+        };
+
+        // Update user in Firestore with login metadata
+        const userRef = doc(db, "students", userId);
+        await updateDoc(userRef, {
+          lastLogin: loginAttempt,
+          loginDevices: loggedInUser.loginDevices
+        });
+
+        // Set user in context and localStorage with cross-device sync
+        setCurrentUser(loggedInUser);
+        localStorage.setItem('user', JSON.stringify(loggedInUser));
+        localStorage.setItem(`user_${userId}_lastLogin`, loginAttempt);
+
+        // Log successful login with device details
+        console.log('User logged in successfully:', {
+          user: loggedInUser,
+          deviceInfo: navigator.userAgent
+        });
+
+        // Toast notification
+        toast({
+          title: `مرحبًا ${loggedInUser.name}`,
+          description: "تم تسجيل الدخول بنجاح",
+        });
+
+        return true;
+      } else {
+        // Check for admin login with similar synchronization
+        const adminQ = query(
+          collection(db, "admins"),
+          where("code", "==", code),
+          where("password", "==", password)
+        );
+
+        const adminSnapshot = await getDocs(adminQ);
+
+        if (!adminSnapshot.empty) {
+          const adminData = adminSnapshot.docs[0].data() as Admin;
+          const adminId = adminSnapshot.docs[0].id;
+
+          // Create admin object with login tracking
+          const loggedInAdmin: Admin = {
+            ...adminData,
+            id: adminId,
+            lastLogin: loginAttempt,
+            loginDevices: [
+              ...(adminData.loginDevices || []),
+              {
+                deviceInfo: navigator.userAgent,
+                timestamp: loginAttempt
+              }
+            ]
+          };
+
+          // Update admin in Firestore
+          const adminRef = doc(db, "admins", adminId);
+          await updateDoc(adminRef, {
+            lastLogin: loginAttempt,
+            loginDevices: loggedInAdmin.loginDevices
+          });
+
+          // Set admin in context and localStorage
+          setCurrentUser(loggedInAdmin);
+          localStorage.setItem('user', JSON.stringify(loggedInAdmin));
+          localStorage.setItem(`admin_${adminId}_lastLogin`, loginAttempt);
+
+          // Log successful admin login
+          console.log('Admin logged in successfully:', loggedInAdmin);
+
+          // Toast notification
+          toast({
+            title: `مرحبًا ${loggedInAdmin.name}`,
+            description: "تم تسجيل الدخول كمسؤول",
+          });
+
+          return true;
+        }
+
+        // If no user found
+        toast({
+          variant: "destructive",
+          title: "خطأ في تسجيل الدخول",
+          description: "رمز المستخدم أو كلمة المرور غير صحيحة",
+        });
+
+        return false;
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      toast({
+        variant: "destructive",
+        title: "خطأ في تسجيل الدخول",
+        description: "حدث خطأ غير متوقع. الرجاء المحاولة مرة أخرى",
+      });
+      return false;
+    }
+  };
+
   const logout = () => {
     setCurrentUser(null);
     localStorage.removeItem("currentUser");
@@ -303,9 +445,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     group: string,
     grade: "first" | "second" | "third"
   ): Promise<Student | null> => {
-    const studentCode = generateRandomCode(6); // Assuming generateRandomCode is imported and works
+    console.log('Creating student with details:', { name, phone, parentPhone, group, grade });
+
+    const studentCode = generateRandomCode(6);
     const studentPassword = generateRandomPassword(5);
-    const newStudent: Omit<Student, 'id'> = {
+    const newStudent: Student = {
+      id: '', // Placeholder, will be replaced by Firestore
       name,
       phone,
       code: studentCode,
@@ -313,20 +458,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       parentPhone,
       group,
       grade,
-      attendance: {}, // Default empty attendance
-      payments: {}, // Default empty payments
-      gradesDetails: {}, // Default empty gradesDetails
+      role: 'student',
+      attendance: {}, 
+      payments: {}, 
+      gradesDetails: {}
     };
 
     try {
-      const docRef = await addDoc(collection(db, "students"), newStudent);
-      const createdStudent = { ...newStudent, id: docRef.id };
-      // onSnapshot will update local state, but we can also update it immediately for responsiveness
-      setStudents(prev => [...prev, createdStudent]);
+      // Add to Firestore
+      const docRef = await addDoc(collection(db, "students"), {
+        name: newStudent.name,
+        phone: newStudent.phone,
+        code: newStudent.code,
+        password: newStudent.password,
+        parentPhone: newStudent.parentPhone,
+        group: newStudent.group,
+        grade: newStudent.grade,
+        role: newStudent.role,
+        attendance: newStudent.attendance,
+        payments: newStudent.payments,
+        gradesDetails: newStudent.gradesDetails
+      });
+
+      // Complete the student object with Firestore ID
+      const createdStudent: Student = { ...newStudent, id: docRef.id };
+      
+      // Update local state and localStorage immediately
+      setStudents(prev => {
+        const updatedStudents = [...prev, createdStudent];
+        localStorage.setItem('students', JSON.stringify(updatedStudents));
+        return updatedStudents;
+      });
+
+      // Optional: Update payments localStorage to ensure synchronization
+      const currentPayments = JSON.parse(localStorage.getItem('payments') || '[]');
+      localStorage.setItem('payments', JSON.stringify(currentPayments));
+
       toast({
         title: "تم إنشاء حساب الطالب بنجاح",
         description: `كود الطالب: ${studentCode} | كلمة المرور: ${studentPassword}`,
       });
+
       return createdStudent;
     } catch (error) {
       console.error("Error creating student in Firestore:", error);
@@ -359,12 +531,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         description: "لم يتم العثور على الطالب.",
       });
       return false;
-        toast({
-            variant: "destructive",
-            title: "خطأ في تحديث الطالب",
-            description: "لم يتم العثور على الطالب.",
-        });
-        return false;
     }
 
     const updatedStudentData = {
@@ -378,34 +544,82 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     try {
+      // Update Firestore
       await setDoc(studentRef, updatedStudentData, { merge: true });
+      
+      // Update local state
+      setStudents(prev => {
+        const updatedStudents = prev.map(student => 
+          student.id === id ? updatedStudentData : student
+        );
+        
+        // Update localStorage
+        localStorage.setItem('students', JSON.stringify(updatedStudents));
+        
+        return updatedStudents;
+      });
+
+      // Synchronize payments
+      const storedPayments = JSON.parse(localStorage.getItem('payments') || '[]');
+      const updatedPayments = storedPayments.map(payment => 
+        payment.studentId === id ? {
+          ...payment,
+          studentName: name,
+          studentCode: currentStudentData.code,
+          grade: grade
+        } : payment
+      );
+
+      // Update payments in localStorage
+      localStorage.setItem('payments', JSON.stringify(updatedPayments));
       
       toast({
         title: "تم تحديث بيانات الطالب بنجاح",
         description: "تم حفظ التغييرات في قاعدة البيانات.",
       });
-      return true;
 
+      return true;
     } catch (error) {
       console.error("Error updating student in Firestore:", error);
       toast({
         variant: "destructive",
         title: "خطأ في تحديث الطالب",
-        description: "لم يتم حفظ التغييرات. الرجاء المحاولة مرة أخرى.",
+        description: "لم يتم حفظ التغيرات. الرجاء المحاولة مرة أخرى.",
       });
       return false;
     }
   };
 
   const deleteStudent = async (id: string): Promise<boolean> => {
+    // Find the student before deletion for logging
+    const studentToDelete = students.find(s => s.id === id);
+    
+    console.log('Attempting to delete student:', studentToDelete);
+
     try {
+      // Delete from Firestore
       await deleteDoc(doc(db, "students", id));
-      // onSnapshot will handle updating the local 'students' state.
-      
+
+      // Update local state
+      setStudents(prev => {
+        const updatedStudents = prev.filter(student => student.id !== id);
+        console.log('Updated students after deletion:', updatedStudents);
+        return updatedStudents;
+      });
+
+      // Update localStorage
+      localStorage.setItem('students', JSON.stringify(students.filter(s => s.id !== id)));
+
+      // Remove associated payments
+      const storedPayments = JSON.parse(localStorage.getItem('payments') || '[]');
+      const updatedPayments = storedPayments.filter(payment => payment.studentId !== id);
+      localStorage.setItem('payments', JSON.stringify(updatedPayments));
+
       toast({
         title: "تم حذف الطالب بنجاح",
-        description: "تمت إزالة بيانات الطالب من قاعدة البيانات.",
+        description: `تمت إزالة بيانات الطالب ${studentToDelete?.name || 'غير معروف'} من قاعدة البيانات.`,
       });
+
       return true;
     } catch (error) {
       console.error("Error deleting student from Firestore:", error);

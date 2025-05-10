@@ -81,18 +81,7 @@ const App = () => {
       <AuthProvider>
         <DataProvider>
           <TooltipProvider>
-            <SonnerToaster 
-              toastOptions={{
-                style: {
-                  background: '#171E31',
-                  color: 'white',
-                  border: '1px solid #D4AF37',
-                  borderRadius: '12px',
-                  opacity: '1',
-                },
-                duration: 2000 // Set duration to 2 seconds
-              }} 
-            />
+            <NotificationsProvider />
             <BrowserRouter>
               <div className="relative min-h-screen font-tajawal">
                 <PhysicsBackground />

@@ -1,0 +1,28 @@
+
+{
+  "name": "موقع الفيزياء التعليمي - م. كريستينا ماهر",
+  "short_name": "فيزياء كريستينا ماهر",
+  "description": "موقع الفيزياء التعليمي للمرحلة الثانوية - المهندسة كريستينا ماهر. دروس، شروحات، امتحانات، وموارد تعليمية في الفيزياء",
+  "categories": ["education", "physics", "learning"],
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#091138",
+  "theme_color": "#091138",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/app-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "permissions": [
+    "notifications",
+    "camera",
+    "mediaDevices",
+    "storage"
+  ]
+}

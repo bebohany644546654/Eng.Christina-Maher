@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/app-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#091138" />
+    <meta name="description" content="موقع الفيزياء التعليمي للمرحلة الثانوية - المهندسة كريستينا ماهر. دروس، شروحات، امتحانات، وموارد تعليمية في الفيزياء" />
+    <meta name="keywords" content="فيزياء, تعليم الفيزياء, المرحلة الثانوية, كريستينا ماهر, دروس فيزياء, شرح فيزياء, فيزياء اونلاين" />
+    <meta name="author" content="Eng. Christina Maher" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://physics-edu.netlify.app/" />
+    <meta property="og:title" content="موقع الفيزياء التعليمي - م. كريستينا ماهر" />
+    <meta property="og:description" content="موقع الفيزياء التعليمي للمرحلة الثانوية - المهندسة كريستينا ماهر. دروس، شروحات، امتحانات، وموارد تعليمية في الفيزياء" />
+    <meta property="og:image" content="/app-icon.png" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://physics-edu.netlify.app/" />
+    <meta property="twitter:title" content="موقع الفيزياء التعليمي - م. كريستينا ماهر" />
+    <meta property="twitter:description" content="موقع الفيزياء التعليمي للمرحلة الثانوية - المهندسة كريستينا ماهر. دروس، شروحات، امتحانات، وموارد تعليمية في الفيزياء" />
+    <meta property="twitter:image" content="/app-icon.png" />
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.youtube.com https://s.ytimg.com;
+      frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com;
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      img-src 'self' https://i.ytimg.com https://img.youtube.com blob: data:;
+      font-src 'self' https://fonts.gstatic.com;
+      connect-src 'self' https://www.googleapis.com;
+    ">
+    <title>Eng. Christina Maher - تطبيق الفيزياء</title>
+    
+    <!-- App icon for iOS -->
+    <link rel="apple-touch-icon" href="/app-icon.png" />
+    
+    <!-- PWA manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Preload Tajawal font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Preload assets -->
+    <link rel="preload" href="/app-icon.png" as="image" />
+    
+    <!-- Schema.org markup for Google -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "EducationalOrganization",
+      "name": "موقع الفيزياء التعليمي - م. كريستينا ماهر",
+      "description": "موقع الفيزياء التعليمي للمرحلة الثانوية - المهندسة كريستينا ماهر. دروس، شروحات، امتحانات، وموارد تعليمية في الفيزياء",
+      "url": "https://physics-edu.netlify.app",
+      "logo": "/app-icon.png",
+      "sameAs": [
+        "https://www.youtube.com/@EngChristinaMaher",
+        "https://www.facebook.com/EngChristinaMaher"
+      ],
+      "teaches": "Physics",
+      "educationalLevel": "Secondary School",
+      "coursePrerequisites": "Basic Mathematics",
+      "provider": {
+        "@type": "Person",
+        "name": "Eng. Christina Maher",
+        "jobTitle": "Physics Teacher",
+        "image": "/app-icon.png"
+      }
+    }
+    </script>
+    
+    <style>
+      /* تأكد من تطبيق الخط العربي */
+      body {
+        font-family: 'Tajawal', sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #091138;
+      }
+      
+      #root {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

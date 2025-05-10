@@ -1,0 +1,501 @@
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import { User, Student, Parent } from "@/types";
+import { generateRandomCode } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
+import { db, isOnline } from "@/firebase"; // Updated import path, rtdb might not be needed directly if not used
+import { doc, setDoc, getDoc, onSnapshot, collection, writeBatch, deleteDoc, addDoc } from "firebase/firestore";
+import { Network } from '@capacitor/network';
+
+interface AuthContextType {
+  currentUser: User | null;
+  students: Student[];
+  parents: Parent[];
+  login: (phoneNumber: string, password: string) => Promise<boolean>;
+  logout: () => void;
+  createStudent: (
+    name: string,
+    phone: string,
+    parentPhone: string,
+    group: string,
+    grade: "first" | "second" | "third"
+  ) => Promise<Student | null>;
+  updateStudent: (
+    id: string,
+    name: string,
+    phone: string,
+    password: string,
+    parentPhone: string,
+    group: string,
+    grade: "first" | "second" | "third"
+  ) => Promise<boolean>;
+  deleteStudent: (id: string) => Promise<boolean>;
+  createParent: (phone: string, studentCode: string) => Promise<Parent | null>;
+  getStudentByCode: (code: string) => Student | undefined;
+  getAllStudents: () => Student[];
+  getAllParents: () => Parent[];
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Initial admin user with updated credentials
+const adminUser: User = {
+  id: "admin-1",
+  name: "admin",
+  phone: "AdminAPPEng.Christina Maher",
+  password: "Eng.Christina Maher0022",
+  role: "admin",
+};
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [parents, setParents] = useState<Parent[]>([]);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const syncCleanup = useRef<(() => void) | null>(null);
+
+  const resetLocalData = useCallback(() => {
+    // localStorage.setItem("students", JSON.stringify([])); // Keep existing students
+    // localStorage.setItem("parents", JSON.stringify([])); // Keep existing parents
+    localStorage.setItem("grades", JSON.stringify([]));
+    localStorage.setItem("attendance", JSON.stringify([]));
+    localStorage.setItem("payments", JSON.stringify([]));
+    // setStudents([]); // Keep existing students in state
+    // setParents([]); // Keep existing parents in state
+    
+    toast({
+      title: "خطأ في تحميل البيانات المحلية",
+      description: "حدث خطأ أثناء تحميل البيانات من الذاكرة المحلية. بعض البيانات قد لا تكون متاحة.",
+      variant: "destructive"
+    });
+  }, []);
+
+  const loadLocalData = useCallback(() => {
+    try {
+      const storedUser = localStorage.getItem("currentUser");
+      const userLoggedIn = localStorage.getItem("userLoggedIn");
+      
+      if (storedUser && userLoggedIn === "true") {
+        setCurrentUser(JSON.parse(storedUser));
+      }
+
+      setStudents(JSON.parse(localStorage.getItem("students") || "[]"));
+      setParents(JSON.parse(localStorage.getItem("parents") || "[]"));
+    } catch (error) {
+      console.error("Error loading local data:", error);
+      resetLocalData();
+    }
+  }, [resetLocalData]);
+
+  const setupFirebaseSync = useCallback(() => {
+    // Students sync
+    const studentsRef = collection(db, 'students');
+    const unsubStudents = onSnapshot(studentsRef, (snapshot) => {
+      const studentsData: Student[] = [];
+      snapshot.forEach((doc) => {
+        studentsData.push({ id: doc.id, ...doc.data() } as Student);
+      });
+      setStudents(studentsData);
+      localStorage.setItem('students', JSON.stringify(studentsData));
+    });
+
+    // Parents sync
+    const parentsRef = collection(db, 'parents');
+    const unsubParents = onSnapshot(parentsRef, (snapshot) => {
+      const parentsData: Parent[] = [];
+      snapshot.forEach((doc) => {
+        parentsData.push({ id: doc.id, ...doc.data() } as Parent);
+      });
+      setParents(parentsData);
+      localStorage.setItem('parents', JSON.stringify(parentsData));
+    });
+
+    return () => {
+      unsubStudents();
+      unsubParents();
+    };
+  }, [setStudents, setParents]); // Added db to dependencies, though it should be stable
+
+  const syncCollectionToFirebase = useCallback(async (collectionName: string, data: any[]) => {
+    const firestoreCollectionRef = collection(db, collectionName);
+    const batch = writeBatch(db);
+    
+    data.forEach((item) => {
+      if (item.id) { // Ensure item has an id
+        const docRef = doc(firestoreCollectionRef, item.id);
+        batch.set(docRef, item, { merge: true }); // Use merge to avoid overwriting if doc exists
+      }
+    });
+
+    await batch.commit();
+  }, []); // Added db to dependencies
+
+  const handleNetworkChange = useCallback(async (status: { connected: boolean }) => {
+    if (status.connected) {
+      if (syncCleanup.current) {
+        syncCleanup.current(); // Clean up previous listener if any
+      }
+      syncCleanup.current = setupFirebaseSync();
+      
+      // Sync local changes to Firebase
+      try {
+        const localStudents = JSON.parse(localStorage.getItem('students') || '[]');
+        const localParents = JSON.parse(localStorage.getItem('parents') || '[]');
+        
+        await Promise.all([
+          syncCollectionToFirebase('students', localStudents),
+          syncCollectionToFirebase('parents', localParents)
+        ]);
+        toast({
+          title: "تمت المزامنة مع السحابة",
+          description: "البيانات المحلية متزامنة الآن مع Firebase.",
+        });
+      } catch (error) {
+        console.error("Sync error on network change:", error);
+        toast({
+          title: "خطأ في المزامنة",
+          description: "فشلت مزامنة البيانات المحلية مع Firebase عند استعادة الاتصال.",
+          variant: "destructive",
+        });
+      }
+    } else {
+      if (syncCleanup.current) {
+        syncCleanup.current();
+        syncCleanup.current = null;
+      }
+      toast({
+        title: "انقطع الاتصال بالإنترنت",
+        description: "سيتم حفظ التغييرات محليًا ومزامنتها عند عودة الاتصال.",
+        variant: "destructive",
+      });
+    }
+  }, [setupFirebaseSync, syncCollectionToFirebase]);
+
+  // Initialize data, setup sync, and network listener
+  useEffect(() => {
+    loadLocalData();
+    setIsInitialized(true); 
+
+    Network.getStatus().then(handleNetworkChange);
+    const networkListenerPromise = Network.addListener('networkStatusChange', handleNetworkChange);
+
+    return () => {
+      if (syncCleanup.current) {
+        syncCleanup.current();
+      }
+      // Ensure listener is removed
+      networkListenerPromise.then(listener => listener.remove()).catch(e => console.error("Failed to remove network listener", e));
+    };
+  }, [loadLocalData, handleNetworkChange]); // Dependencies for the main effect
+
+  // Save data to localStorage when it changes
+  useEffect(() => {
+    if (!isInitialized) return;
+    
+    if (currentUser) {
+      localStorage.setItem("currentUser", JSON.stringify(currentUser));
+      localStorage.setItem("userLoggedIn", "true");
+    }
+    // Avoid stringifying and saving if identical to prevent unnecessary writes/re-renders
+    const storedStudents = localStorage.getItem("students");
+    if (JSON.stringify(students) !== storedStudents) {
+      localStorage.setItem("students", JSON.stringify(students));
+    }
+    
+    const storedParents = localStorage.getItem("parents");
+    if (JSON.stringify(parents) !== storedParents) {
+      localStorage.setItem("parents", JSON.stringify(parents));
+    }
+  }, [currentUser, students, parents, isInitialized]);
+
+  const login = async (phoneNumber: string, password: string): Promise<boolean> => {
+    // Check admin login
+    if (phoneNumber === adminUser.phone && password === adminUser.password) {
+      setCurrentUser(adminUser);
+      localStorage.setItem("currentUser", JSON.stringify(adminUser));
+      localStorage.setItem("userLoggedIn", "true");
+      
+      toast({
+        title: "تم تسجيل الدخول بنجاح",
+        description: "مرحباً بك في لوحة التحكم",
+      });
+      return true;
+    }
+
+    // Check local storage first
+    const student = students.find(s => s.code === phoneNumber && s.password === password);
+    if (student) {
+      const userData: User = {
+        id: student.id,
+        name: student.name,
+        phone: student.phone,
+        password: student.password,
+        role: "student",
+        code: student.code,
+        group: student.group,
+        grade: student.grade
+      };
+      
+      setCurrentUser(userData);
+      localStorage.setItem("currentUser", JSON.stringify(userData));
+      localStorage.setItem("userLoggedIn", "true");
+      
+      toast({
+        title: "تم تسجيل الدخول بنجاح",
+        description: `مرحباً ${student.name}`,
+      });
+      return true;
+    }
+
+    // Check parent login
+    const parent = parents.find(p => p.phone === phoneNumber && p.password === password);
+    if (parent) {
+      const userData: User = {
+        id: parent.id,
+        name: `ولي أمر ${parent.studentName}`,
+        phone: parent.phone,
+        password: parent.password,
+        role: "parent"
+      };
+      
+      setCurrentUser(userData);
+      localStorage.setItem("currentUser", JSON.stringify(userData));
+      localStorage.setItem("userLoggedIn", "true");
+      
+      toast({
+        title: "تم تسجيل الدخول بنجاح",
+        description: "مرحباً بك",
+      });
+      return true;
+    }
+
+    toast({
+      variant: "destructive",
+      title: "فشل تسجيل الدخول",
+      description: "رقم الهاتف أو كلمة المرور غير صحيحة",
+    });
+    return false;
+  };
+
+  const logout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem("currentUser");
+    localStorage.removeItem("userLoggedIn");
+    toast({
+      title: "تم تسجيل الخروج بنجاح",
+      description: "نأمل أن نراك مرة أخرى قريبًا.",
+    });
+  };
+
+  // Helper function to generate a random password
+  const generateRandomPassword = (length: number): string => {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return result;
+  };
+
+  const createStudent = async (
+    name: string,
+    phone: string,
+    parentPhone: string,
+    group: string,
+    grade: "first" | "second" | "third"
+  ): Promise<Student | null> => {
+    const studentCode = generateRandomCode(6); // Assuming generateRandomCode is imported and works
+    const studentPassword = generateRandomPassword(5);
+    const newStudent: Omit<Student, 'id'> = {
+      name,
+      phone,
+      code: studentCode,
+      password: studentPassword,
+      parentPhone,
+      group,
+      grade,
+      attendance: {}, // Default empty attendance
+      payments: {}, // Default empty payments
+      gradesDetails: {}, // Default empty gradesDetails
+    };
+
+    try {
+      const docRef = await addDoc(collection(db, "students"), newStudent);
+      const createdStudent = { ...newStudent, id: docRef.id };
+      // onSnapshot will update local state, but we can also update it immediately for responsiveness
+      setStudents(prev => [...prev, createdStudent]);
+      toast({
+        title: "تم إنشاء حساب الطالب بنجاح",
+        description: `كود الطالب: ${studentCode} | كلمة المرور: ${studentPassword}`,
+      });
+      return createdStudent;
+    } catch (error) {
+      console.error("Error creating student in Firestore:", error);
+      toast({
+        variant: "destructive",
+        title: "خطأ في إنشاء حساب الطالب",
+        description: "لم يتم حفظ بيانات الطالب. الرجاء المحاولة مرة أخرى.",
+      });
+      return null;
+    }
+  };
+
+  const updateStudent = async (
+    id: string,
+    name: string,
+    phone: string,
+    parentPhone: string,
+    group: string,
+    grade: "first" | "second" | "third",
+    password?: string // Password is now optional
+  ): Promise<boolean> => {
+    const studentRef = doc(db, "students", id);
+    const currentStudentData = students.find(s => s.id === id);
+
+    if (!currentStudentData) {
+      console.error("Student not found for update:", id);
+      toast({
+        variant: "destructive",
+        title: "خطأ في تحديث الطالب",
+        description: "لم يتم العثور على الطالب.",
+      });
+      return false;
+        toast({
+            variant: "destructive",
+            title: "خطأ في تحديث الطالب",
+            description: "لم يتم العثور على الطالب.",
+        });
+        return false;
+    }
+
+    const updatedStudentData = {
+      ...currentStudentData, 
+      name,
+      phone,
+      password: password || currentStudentData.password, 
+      parentPhone,
+      group,
+      grade,
+    };
+
+    try {
+      await setDoc(studentRef, updatedStudentData, { merge: true });
+      
+      toast({
+        title: "تم تحديث بيانات الطالب بنجاح",
+        description: "تم حفظ التغييرات في قاعدة البيانات.",
+      });
+      return true;
+
+    } catch (error) {
+      console.error("Error updating student in Firestore:", error);
+      toast({
+        variant: "destructive",
+        title: "خطأ في تحديث الطالب",
+        description: "لم يتم حفظ التغييرات. الرجاء المحاولة مرة أخرى.",
+      });
+      return false;
+    }
+  };
+
+  const deleteStudent = async (id: string): Promise<boolean> => {
+    try {
+      await deleteDoc(doc(db, "students", id));
+      // onSnapshot will handle updating the local 'students' state.
+      
+      toast({
+        title: "تم حذف الطالب بنجاح",
+        description: "تمت إزالة بيانات الطالب من قاعدة البيانات.",
+      });
+      return true;
+    } catch (error) {
+      console.error("Error deleting student from Firestore:", error);
+      toast({
+        variant: "destructive",
+        title: "خطأ في حذف الطالب",
+        description: "لم يتم حذف الطالب من قاعدة البيانات. الرجاء المحاولة مرة أخرى.",
+      });
+      return false;
+    }
+  };
+
+  const createParent = async (phone: string, studentCode: string): Promise<Parent | null> => {
+    const student = students.find(s => s.code === studentCode);
+
+    if (!student) {
+      toast({
+        variant: "destructive",
+        title: "خطأ في إنشاء حساب ولي الأمر",
+        description: "كود الطالب المقدم غير صحيح أو الطالب غير موجود.",
+      });
+      return null;
+    }
+
+    const password = generateRandomCode(8); // Assuming generateRandomCode exists and is suitable
+
+    const parentDataToSave = {
+      phone,
+      studentCode,
+      studentName: student.name,
+      password, // WARNING: Passwords should be handled by Firebase Auth or securely hashed.
+    };
+
+    try {
+      const docRef = await addDoc(collection(db, "parents"), parentDataToSave);
+      
+      // onSnapshot in setupFirebaseSync will handle updating the local 'parents' state and localStorage.
+
+      toast({
+        title: "تم إنشاء حساب ولي الأمر بنجاح في Firestore",
+        description: `مرتبط بالطالب: ${student.name}. كلمة المرور: ${password}`,
+      });
+      
+      return { ...parentDataToSave, id: docRef.id } as Parent;
+
+    } catch (error) {
+      console.error("Error creating parent in Firestore:", error);
+      toast({
+        variant: "destructive",
+        title: "خطأ في إنشاء حساب ولي الأمر",
+        description: "لم يتم حفظ بيانات ولي الأمر في قاعدة البيانات. الرجاء المحاولة مرة أخرى.",
+      });
+      return null;
+    }
+  };
+
+  const getStudentByCode = (code: string): Student | undefined => {
+    return students.find(student => student.code === code);
+  };
+
+  const getAllStudents = (): Student[] => {
+    return students;
+  };
+
+  const getAllParents = (): Parent[] => {
+    return parents;
+  };
+
+  const value = {
+    currentUser,
+    students,
+    parents,
+    login,
+    logout,
+    createStudent,
+    updateStudent,
+    deleteStudent,
+    createParent,
+    getStudentByCode,
+    getAllStudents,
+    getAllParents,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+};

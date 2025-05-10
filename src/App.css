@@ -1,0 +1,231 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --physics-navy: #1e293b;
+  --physics-dark: #0f172a;
+  --physics-gold: #f59e0b;
+  --physics-lightgold: #fbbf24;
+}
+
+/* Base styles and utility classes */
+body {
+  direction: rtl;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  background-color: var(--physics-navy);
+  color: white;
+}
+
+.bg-physics-navy {
+  background-color: var(--physics-navy);
+}
+
+.bg-physics-dark {
+  background-color: var(--physics-dark);
+}
+
+.bg-physics-gold {
+  background-color: var(--physics-gold);
+}
+
+.bg-physics-lightgold {
+  background-color: var(--physics-lightgold);
+}
+
+.text-physics-gold {
+  color: var(--physics-gold);
+}
+
+.text-physics-navy {
+  color: var(--physics-navy);
+}
+
+/* Button styles */
+.goldBtn {
+  background-color: var(--physics-gold);
+  color: var(--physics-navy);
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.goldBtn:hover {
+  opacity: 0.9;
+}
+
+/* Input fields */
+.inputField {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background-color: #334155;
+  border: 1px solid #475569;
+  color: white;
+  outline: none;
+}
+
+.inputField:focus {
+  border-color: var(--physics-gold);
+}
+
+/* Physics animations */
+.physics-particle {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.physics-electron {
+  background: #4fc3f7;
+  box-shadow: 0 0 10px #4fc3f7, 0 0 20px #4fc3f7;
+  animation: orbit 10s linear infinite;
+}
+
+.physics-atom {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.physics-formula {
+  position: absolute;
+  color: rgba(255, 255, 255, 0.3);
+  font-family: 'Times New Roman', serif;
+  font-size: 24px;
+  pointer-events: none;
+  user-select: none;
+  z-index: 1;
+}
+
+.phone-button {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  z-index: 100;
+  background-color: var(--physics-gold);
+  color: var(--physics-dark);
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.phone-button:hover {
+  transform: scale(1.1);
+}
+
+.phone-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0,0,0,0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.phone-modal-content {
+  background-color: var(--physics-dark);
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+  padding: 20px;
+  border: 1px solid var(--physics-gold);
+}
+
+/* Video player styles */
+.video-container {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+  background-color: #000;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.video-container iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.video-list-item {
+  transition: all 0.2s ease;
+}
+
+.video-list-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Youtube Player Styles */
+.youtube-player-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.youtube-player-container iframe {
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+.youtube-player-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  background: transparent;
+  cursor: pointer;
+}
+
+@keyframes orbit {
+  0% { transform: rotate(0deg) translateX(50px) rotate(0deg); }
+  100% { transform: rotate(360deg) translateX(50px) rotate(-360deg); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-15px); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--physics-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
